@@ -1,0 +1,11 @@
+{
+  "sma_period": 10,
+  "timeframe": "5m",
+  "reaction_percentage": 5.0,
+  "long_enabled": true,
+  "short_enabled": true,
+  "scan_all": true,
+  "symbols": [],
+  "telegram_token": "8154127903:AAG33RAXtVyZlfq3TCN-_YIzG-LqgiHidAI",
+  "telegram_chat_id": "-1004399090716"
+}
