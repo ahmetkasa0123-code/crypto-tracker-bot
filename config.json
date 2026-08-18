@@ -7,5 +7,6 @@
   "scan_all": true,
   "symbols": [],
   "telegram_token": "8154127903:AAG33RAXtVyZlfq3TCN-_YIzG-LqgiHidAI",
-  "telegram_chat_id": "-1004399090716"
+  "telegram_chat_id": "-1004399090716",
+  "timeout_minutes": 15
 }
