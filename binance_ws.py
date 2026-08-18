@@ -171,6 +171,19 @@ class BinanceTracker:
                     target = 0.0
                     state_time = 0.0
 
+        # Son durumu kaydetmeden önce zaman aşımı kontrolü yap
+        # Eğer son sinyal çok eskiyse (şimdiki zamana göre), IDLE'a sıfırla
+        if state in ("TOUCHED_LONG", "TOUCHED_SHORT"):
+            timeout_minutes = self.config.get("timeout_minutes", 0)
+            if timeout_minutes > 0 and state_time > 0:
+                elapsed = time.time() - state_time
+                if elapsed > timeout_minutes * 60:
+                    logger.info(f"[{symbol.upper()}] Geçmiş tarama: sinyal {elapsed/60:.1f} dk önce oluşmuş, zaman aşımı ({timeout_minutes} dk) dolmuş. Sıfırlandı.")
+                    state = "IDLE"
+                    ref_sma = 0.0
+                    target = 0.0
+                    state_time = 0.0
+
         update_state(symbol.upper() + ".P", state, ref_sma, target, state_time)
 
         last_closed_candles = candles[n - 1 - self.sma_period : n - 1]
