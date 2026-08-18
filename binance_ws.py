@@ -130,15 +130,15 @@ class BinanceTracker:
                     state = "TOUCHED_LONG"
                     ref_sma = curr_sma
                     target = ref_sma + (ref_sma * self.reaction_percentage / 100)
-                    state_time = curr_candle["T"] / 1000.0
+                    state_time = curr_candle["t"] / 1000.0
                 elif self.short_enabled and prev_price > prev_sma and curr_low <= curr_sma:
                     state = "TOUCHED_SHORT"
                     ref_sma = curr_sma
                     target = ref_sma - (ref_sma * self.reaction_percentage / 100)
-                    state_time = curr_candle["T"] / 1000.0
+                    state_time = curr_candle["t"] / 1000.0
             elif state == "TOUCHED_LONG":
                 timeout_minutes = self.config.get("timeout_minutes", 0)
-                if timeout_minutes > 0 and (curr_candle["T"] / 1000.0 - state_time) > timeout_minutes * 60:
+                if timeout_minutes > 0 and (curr_candle["t"] / 1000.0 - state_time) > timeout_minutes * 60:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
@@ -155,7 +155,7 @@ class BinanceTracker:
                     state_time = 0.0
             elif state == "TOUCHED_SHORT":
                 timeout_minutes = self.config.get("timeout_minutes", 0)
-                if timeout_minutes > 0 and (curr_candle["T"] / 1000.0 - state_time) > timeout_minutes * 60:
+                if timeout_minutes > 0 and (curr_candle["t"] / 1000.0 - state_time) > timeout_minutes * 60:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
