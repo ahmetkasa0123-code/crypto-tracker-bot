@@ -1,5 +1,5 @@
 {
-  "sma_period": 10,
+  "sma_period": 50,
   "timeframe": "5m",
   "reaction_percentage": 5.0,
   "long_enabled": true,

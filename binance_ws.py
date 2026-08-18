@@ -4,6 +4,7 @@ import logging
 import aiohttp
 import websockets
 from database import get_state, update_state, reset_state, clean_old_states
+import time
 
 logger = logging.getLogger("binance_ws")
 
@@ -110,8 +111,10 @@ class BinanceTracker:
         state = "IDLE"
         ref_sma = 0.0
         target = 0.0
+        state_time = 0.0
 
-        for i in range(self.sma_period, n - 1):
+        for i in range(self.sma_period, n):
+            curr_candle = candles[i]
             prev_candles = candles[i - self.sma_period : i]
             prev_sma = sum(c["c"] for c in prev_candles) / self.sma_period
             prev_price = candles[i - 1]["c"]
@@ -127,43 +130,41 @@ class BinanceTracker:
                     state = "TOUCHED_LONG"
                     ref_sma = curr_sma
                     target = ref_sma + (ref_sma * self.reaction_percentage / 100)
-                    if curr_high >= target:
-                        state = "IDLE"
-                        ref_sma = 0.0
-                        target = 0.0
+                    state_time = curr_candle["T"] / 1000.0
                 elif self.short_enabled and prev_price > prev_sma and curr_price <= curr_sma:
                     state = "TOUCHED_SHORT"
                     ref_sma = curr_sma
                     target = ref_sma - (ref_sma * self.reaction_percentage / 100)
-                    if curr_low <= target:
-                        state = "IDLE"
-                        ref_sma = 0.0
-                        target = 0.0
+                    state_time = curr_candle["T"] / 1000.0
             elif state == "TOUCHED_LONG":
                 if curr_high >= target:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
+                    state_time = 0.0
                 elif curr_low < curr_sma:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
+                    state_time = 0.0
             elif state == "TOUCHED_SHORT":
                 if curr_low <= target:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
+                    state_time = 0.0
                 elif curr_high > curr_sma:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
+                    state_time = 0.0
 
-        update_state(symbol.upper() + ".P", state, ref_sma, target)
+        update_state(symbol.upper() + ".P", state, ref_sma, target, state_time)
 
         last_closed_candles = candles[n - 1 - self.sma_period : n - 1]
         last_closed_sma = sum(c["c"] for c in last_closed_candles) / self.sma_period
         
-        self.prev_data[symbol]["price"] = candles[n - 2]["c"]
+        self.prev_data[symbol]["price"] = candles[n - 1]["c"]
         self.prev_data[symbol]["sma"] = last_closed_sma
 
     def calculate_sma(self, symbol):
@@ -187,16 +188,24 @@ class BinanceTracker:
             if self.long_enabled and prev_price < prev_sma and current_price >= current_sma:
                 reference_sma = current_sma
                 target_price = reference_sma + (reference_sma * self.reaction_percentage / 100)
-                update_state(symbol.upper() + ".P", "TOUCHED_LONG", reference_sma, target_price)
+                update_state(symbol.upper() + ".P", "TOUCHED_LONG", reference_sma, target_price, time.time())
                 logger.info(f"[BİLGİ] {symbol.upper() + '.P'} SMA {self.sma_period}'ye (Yukarı) dokundu. Referans: {format_price(reference_sma)}, Hedef: {format_price(target_price)}")
 
             elif self.short_enabled and prev_price > prev_sma and current_price <= current_sma:
                 reference_sma = current_sma
                 target_price = reference_sma - (reference_sma * self.reaction_percentage / 100)
-                update_state(symbol.upper() + ".P", "TOUCHED_SHORT", reference_sma, target_price)
+                update_state(symbol.upper() + ".P", "TOUCHED_SHORT", reference_sma, target_price, time.time())
                 logger.info(f"[BİLGİ] {symbol.upper() + '.P'} SMA {self.sma_period}'ye (Aşağı) dokundu. Referans: {format_price(reference_sma)}, Hedef: {format_price(target_price)}")
 
         elif current_state == "TOUCHED_LONG":
+            timeout_minutes = self.config.get("timeout_minutes", 0)
+            if timeout_minutes > 0:
+                state_timestamp = state_data.get("timestamp", 0.0)
+                if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+                    logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
+                    reset_state(symbol.upper() + ".P")
+                    return
+                    
             target = state_data["target_price"]
             if current_price >= target:
                 await self.fire_alarm(symbol.upper() + ".P", current_price, state_data["reference_sma"], "LONG")
@@ -206,6 +215,14 @@ class BinanceTracker:
                 reset_state(symbol.upper() + ".P")
                 
         elif current_state == "TOUCHED_SHORT":
+            timeout_minutes = self.config.get("timeout_minutes", 0)
+            if timeout_minutes > 0:
+                state_timestamp = state_data.get("timestamp", 0.0)
+                if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+                    logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
+                    reset_state(symbol.upper() + ".P")
+                    return
+                    
             target = state_data["target_price"]
             if current_price <= target:
                 await self.fire_alarm(symbol.upper() + ".P", current_price, state_data["reference_sma"], "SHORT")

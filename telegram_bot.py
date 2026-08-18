@@ -32,6 +32,7 @@ def get_main_keyboard():
         [InlineKeyboardButton(text="📈 SMA Periyodu Değiştir", callback_data="menu_sma")],
         [InlineKeyboardButton(text="🎯 Tepki Yüzdesi Değiştir", callback_data="menu_percent")],
         [InlineKeyboardButton(text="⏱ Zaman Dilimi Değiştir", callback_data="menu_timeframe")],
+        [InlineKeyboardButton(text="⏳ Zaman Aşımı Değiştir", callback_data="menu_timeout")],
         [InlineKeyboardButton(text="🔄 Güncel Ayarları Göster", callback_data="menu_refresh")]
     ])
 
@@ -65,6 +66,16 @@ def get_timeframe_keyboard():
         [InlineKeyboardButton(text="◀️ Geri Dön", callback_data="menu_main")]
     ])
 
+def get_timeout_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="5 dk", callback_data="settime_5"),
+         InlineKeyboardButton(text="15 dk", callback_data="settime_15"),
+         InlineKeyboardButton(text="30 dk", callback_data="settime_30")],
+        [InlineKeyboardButton(text="1 Saat", callback_data="settime_60"),
+         InlineKeyboardButton(text="Sınırsız", callback_data="settime_0")],
+        [InlineKeyboardButton(text="◀️ Geri Dön", callback_data="menu_main")]
+    ])
+
 class TelegramNotifier:
     def __init__(self, config, restart_event):
         self.config = config
@@ -85,11 +96,13 @@ class TelegramNotifier:
         conf = self._load_config()
         import datetime
         now = datetime.datetime.now().strftime("%H:%M:%S")
+        timeout_text = "Sınırsız" if conf.get('timeout_minutes', 0) == 0 else f"{conf.get('timeout_minutes', 0)} dk"
         return (
             "⚙️ *Sistem Kontrol Paneli*\n\n"
             f"📈 *SMA Periyodu:* {conf['sma_period']}\n"
             f"⏱ *Zaman Dilimi:* {conf['timeframe']}\n"
             f"🎯 *Hedef Tepki:* %{conf['reaction_percentage']}\n"
+            f"⏳ *Zaman Aşımı:* {timeout_text}\n"
             f"🟢 *LONG Aktif:* {'Açık' if conf['long_enabled'] else 'Kapalı'}\n"
             f"🔴 *SHORT Aktif:* {'Açık' if conf['short_enabled'] else 'Kapalı'}\n\n"
             f"🕒 _Son Güncelleme: {now}_\n\n"
@@ -134,6 +147,8 @@ class TelegramNotifier:
                 await callback.message.edit_text("🎯 *Yeni Hedef Yüzdesini Seçin:*", parse_mode="Markdown", reply_markup=get_percent_keyboard())
             elif action == "timeframe":
                 await callback.message.edit_text("⏱ *Yeni Zaman Dilimini Seçin:*", parse_mode="Markdown", reply_markup=get_timeframe_keyboard())
+            elif action == "timeout":
+                await callback.message.edit_text("⏳ *Zaman Aşımı Süresini Seçin:*", parse_mode="Markdown", reply_markup=get_timeout_keyboard())
             elif action == "tracked":
                 await callback.message.edit_text(self._get_tracked_coins_text(), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="◀️ Geri Dön", callback_data="menu_main")]
@@ -152,6 +167,9 @@ class TelegramNotifier:
                 self._update_config("reaction_percentage", float(val))
             elif setting_type == "settf":
                 self._update_config("timeframe", val)
+            elif setting_type == "settime":
+                self._update_config("timeout_minutes", int(val))
+                val = f"{val} dk" if int(val) > 0 else "Sınırsız"
                 
             await callback.answer(f"Ayarlar güncellendi: {val}", show_alert=True)
             await callback.message.edit_text(f"✅ Ayarlar güncellendi! Sistem *{val}* ile arka planda otomatik yeniden başlatıldı.\n\n" + self._get_ayarlar_text(), parse_mode="Markdown", reply_markup=get_main_keyboard())
