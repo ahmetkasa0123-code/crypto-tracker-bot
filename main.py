@@ -28,6 +28,19 @@ async def start_web_server():
     await site.start()
     logger.info(f"Web server started on port {port}")
 
+async def self_ping():
+    import aiohttp
+    url = "https://crypto-tracker-e21v.onrender.com/"
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    logger.info(f"[PING] Self-ping attı: HTTP {response.status}")
+        except Exception as e:
+            logger.error(f"[PING] Self-ping hatası: {e}")
+        # Her 5 dakikada bir (300 saniye) ping at
+        await asyncio.sleep(300)
+
 def load_config():
     with open("config.json", "r") as f:
         return json.load(f)
@@ -48,6 +61,9 @@ async def main():
     
     # Start fake web server for Render
     asyncio.create_task(start_web_server())
+    
+    # Uyku modunu engellemek için self-ping başlat
+    asyncio.create_task(self_ping())
     
     restart_event = asyncio.Event()
     
