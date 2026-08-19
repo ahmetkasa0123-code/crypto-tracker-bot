@@ -137,8 +137,9 @@ class BinanceTracker:
                     target = ref_sma - (ref_sma * self.reaction_percentage / 100)
                     state_time = curr_candle["t"] / 1000.0
             elif state == "TOUCHED_LONG":
-                timeout_minutes = self.config.get("timeout_minutes", 0)
-                if timeout_minutes > 0 and (curr_candle["t"] / 1000.0 - state_time) > timeout_minutes * 60:
+                timeout_minutes = self.config.get("timeout_minutes", 15)
+                elapsed_candle = curr_candle["t"] / 1000.0 - state_time
+                if elapsed_candle > timeout_minutes * 60:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
@@ -154,8 +155,9 @@ class BinanceTracker:
                     target = 0.0
                     state_time = 0.0
             elif state == "TOUCHED_SHORT":
-                timeout_minutes = self.config.get("timeout_minutes", 0)
-                if timeout_minutes > 0 and (curr_candle["t"] / 1000.0 - state_time) > timeout_minutes * 60:
+                timeout_minutes = self.config.get("timeout_minutes", 15)
+                elapsed_candle = curr_candle["t"] / 1000.0 - state_time
+                if elapsed_candle > timeout_minutes * 60:
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
@@ -174,15 +176,18 @@ class BinanceTracker:
         # Son durumu kaydetmeden önce zaman aşımı kontrolü yap
         # Eğer son sinyal çok eskiyse (şimdiki zamana göre), IDLE'a sıfırla
         if state in ("TOUCHED_LONG", "TOUCHED_SHORT"):
-            timeout_minutes = self.config.get("timeout_minutes", 0)
-            if timeout_minutes > 0 and state_time > 0:
+            timeout_minutes = self.config.get("timeout_minutes", 15)
+            if state_time > 0:
                 elapsed = time.time() - state_time
+                logger.info(f"[{symbol.upper()}] Geçmiş tarama: sinyal {elapsed/60:.1f} dk önce oluşmuş. Timeout sınırı: {timeout_minutes} dk.")
                 if elapsed > timeout_minutes * 60:
-                    logger.info(f"[{symbol.upper()}] Geçmiş tarama: sinyal {elapsed/60:.1f} dk önce oluşmuş, zaman aşımı ({timeout_minutes} dk) dolmuş. Sıfırlandı.")
+                    logger.info(f"[{symbol.upper()}] TIMEOUT → IDLE'a sıfırlandı.")
                     state = "IDLE"
                     ref_sma = 0.0
                     target = 0.0
                     state_time = 0.0
+                else:
+                    logger.info(f"[{symbol.upper()}] Geçerli sinyal, veritabanına kaydediliyor.")
 
         update_state(symbol.upper() + ".P", state, ref_sma, target, state_time)
 
@@ -223,13 +228,12 @@ class BinanceTracker:
                 logger.info(f"[BİLGİ] {symbol.upper() + '.P'} SMA {self.sma_period}'ye (Aşağı) dokundu. Referans: {format_price(reference_sma)}, Hedef: {format_price(target_price)}")
 
         elif current_state == "TOUCHED_LONG":
-            timeout_minutes = self.config.get("timeout_minutes", 0)
-            if timeout_minutes > 0:
-                state_timestamp = state_data.get("timestamp", 0.0)
-                if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
-                    logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
-                    reset_state(symbol.upper() + ".P")
-                    return
+            timeout_minutes = self.config.get("timeout_minutes", 15)
+            state_timestamp = state_data.get("timestamp", 0.0)
+            if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+                logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
+                reset_state(symbol.upper() + ".P")
+                return
                     
             target = state_data["target_price"]
             if current_price >= target:
@@ -240,13 +244,12 @@ class BinanceTracker:
                 reset_state(symbol.upper() + ".P")
                 
         elif current_state == "TOUCHED_SHORT":
-            timeout_minutes = self.config.get("timeout_minutes", 0)
-            if timeout_minutes > 0:
-                state_timestamp = state_data.get("timestamp", 0.0)
-                if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
-                    logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
-                    reset_state(symbol.upper() + ".P")
-                    return
+            timeout_minutes = self.config.get("timeout_minutes", 15)
+            state_timestamp = state_data.get("timestamp", 0.0)
+            if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+                logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
+                reset_state(symbol.upper() + ".P")
+                return
                     
             target = state_data["target_price"]
             if current_price <= target:
