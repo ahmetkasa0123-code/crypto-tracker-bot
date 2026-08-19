@@ -136,6 +136,32 @@ class TelegramNotifier:
         async def cmd_ayarlar(message: Message):
             await message.reply(self._get_ayarlar_text(), parse_mode="Markdown", reply_markup=get_main_keyboard())
 
+        @self.dp.message(Command("debug_db"))
+        async def cmd_debug_db(message: Message):
+            parts = message.text.split()
+            if len(parts) < 2:
+                await message.reply("Kullanım: /debug_db <SYMBOL> (Örn: /debug_db SPACEUSDT.P)")
+                return
+            
+            symbol = parts[1].upper()
+            conn = sqlite3.connect("states.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT state, reference_sma, target_price, timestamp FROM states WHERE symbol = ?", (symbol,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                import time
+                state, ref, target, ts = row
+                elapsed = time.time() - ts if ts > 0 else 0
+                await message.reply(f"📊 *{symbol} Veritabanı Durumu:*\n\n"
+                                    f"Durum: `{state}`\n"
+                                    f"Referans SMA: `{ref}`\n"
+                                    f"Hedef: `{target}`\n"
+                                    f"Timestamp: `{ts}` (Şu anki zamana göre {elapsed/60:.1f} dakika önce)", parse_mode="Markdown")
+            else:
+                await message.reply(f"{symbol} için veritabanında kayıt bulunamadı.")
+
         @self.dp.callback_query(F.data.startswith("menu_"))
         async def on_menu_click(callback: CallbackQuery):
             action = callback.data.split("_")[1]
