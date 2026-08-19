@@ -230,7 +230,12 @@ class BinanceTracker:
         elif current_state == "TOUCHED_LONG":
             timeout_minutes = self.config.get("timeout_minutes", 15)
             state_timestamp = state_data.get("timestamp", 0.0)
-            if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+            # timestamp=0 ise eski/bozuk kayıt, direkt sil
+            if state_timestamp <= 0:
+                logger.info(f"[GEÇERSİZ] {symbol.upper() + '.P'} timestamp=0, eski kayıt. Siliniyor.")
+                reset_state(symbol.upper() + ".P")
+                return
+            if time.time() - state_timestamp > timeout_minutes * 60:
                 logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
                 reset_state(symbol.upper() + ".P")
                 return
@@ -246,7 +251,12 @@ class BinanceTracker:
         elif current_state == "TOUCHED_SHORT":
             timeout_minutes = self.config.get("timeout_minutes", 15)
             state_timestamp = state_data.get("timestamp", 0.0)
-            if state_timestamp > 0 and time.time() - state_timestamp > timeout_minutes * 60:
+            # timestamp=0 ise eski/bozuk kayıt, direkt sil
+            if state_timestamp <= 0:
+                logger.info(f"[GEÇERSİZ] {symbol.upper() + '.P'} timestamp=0, eski kayıt. Siliniyor.")
+                reset_state(symbol.upper() + ".P")
+                return
+            if time.time() - state_timestamp > timeout_minutes * 60:
                 logger.info(f"[ZAMAN AŞIMI] {symbol.upper() + '.P'} {timeout_minutes} dk içinde hedefe ulaşamadı. İptal edildi.")
                 reset_state(symbol.upper() + ".P")
                 return
