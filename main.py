@@ -22,19 +22,15 @@ from aiohttp import web
 global_tracker = None
 
 async def health_check(request):
-    log_content = ""
+    import aiohttp
+    text = ""
     try:
-        with open("app.log", "r") as f:
-            lines = f.readlines()
-            log_content = "".join(lines[-20:])
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://fapi.binance.com/fapi/v1/exchangeInfo") as response:
+                text = f"Status: {response.status}\nBody: {await response.text()}"
     except Exception as e:
-        log_content = str(e)
-
-    if global_tracker:
-        symbols_count = len(getattr(global_tracker, 'symbols', []))
-        is_running = getattr(global_tracker, 'is_running', False)
-        return web.Response(text=f"Bot is running! Tracker: {is_running}, Symbols: {symbols_count}\n\nLogs:\n{log_content}")
-    return web.Response(text=f"Bot is running! Tracker not started yet.\n\nLogs:\n{log_content}")
+        text = str(e)
+    return web.Response(text=text)
 
 async def start_web_server():
     app = web.Application()
