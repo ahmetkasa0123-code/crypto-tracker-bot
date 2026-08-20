@@ -15,8 +15,14 @@ logger = logging.getLogger("main")
 import os
 from aiohttp import web
 
+global_tracker = None
+
 async def health_check(request):
-    return web.Response(text="Bot is running!")
+    if global_tracker:
+        symbols_count = len(getattr(global_tracker, 'symbols', []))
+        is_running = getattr(global_tracker, 'is_running', False)
+        return web.Response(text=f"Bot is running! Tracker: {is_running}, Symbols: {symbols_count}")
+    return web.Response(text="Bot is running! Tracker not started yet.")
 
 async def start_web_server():
     app = web.Application()
@@ -75,7 +81,9 @@ async def main():
         # Config'i her restart döngüsünde yeniden oku
         config = load_config()
         
+        global global_tracker
         tracker = BinanceTracker(config, tg_bot)
+        global_tracker = tracker
         tracker_task = asyncio.create_task(tracker.run())
         restart_task = asyncio.create_task(restart_event.wait())
         
