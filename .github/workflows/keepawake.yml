@@ -1,0 +1,13 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Web Service
+        run: curl -s https://crypto-tracker-e21v.onrender.com/
