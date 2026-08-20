@@ -3,7 +3,7 @@ import sqlite3
 DB_PATH = "states.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS states (
@@ -25,7 +25,7 @@ def init_db():
     conn.close()
 
 def get_state(symbol):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     cursor = conn.cursor()
     cursor.execute("SELECT state, reference_sma, target_price, timestamp FROM states WHERE symbol = ?", (symbol,))
     row = cursor.fetchone()
@@ -35,26 +35,29 @@ def get_state(symbol):
     return {"state": "IDLE", "reference_sma": 0.0, "target_price": 0.0, "timestamp": 0.0}
 
 def update_state(symbol, state, reference_sma, target_price, timestamp=0.0):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO states (symbol, state, reference_sma, target_price, timestamp)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(symbol) DO UPDATE SET
-            state=excluded.state,
-            reference_sma=excluded.reference_sma,
-            target_price=excluded.target_price,
-            timestamp=excluded.timestamp
-    ''', (symbol, state, reference_sma, target_price, timestamp))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_PATH, timeout=30.0)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO states (symbol, state, reference_sma, target_price, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                state=excluded.state,
+                reference_sma=excluded.reference_sma,
+                target_price=excluded.target_price,
+                timestamp=excluded.timestamp
+        ''', (symbol, state, reference_sma, target_price, timestamp))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[DB HATA] {symbol} güncellenirken hata: {e}")
 
 def reset_state(symbol):
     update_state(symbol, "IDLE", 0.0, 0.0, 0.0)
 
 def clean_old_states(active_symbols):
     """Veritabanında olup Binance Futures aktif listesinde olmayan eski/çöp sembolleri temizler."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     cursor = conn.cursor()
     if active_symbols:
         placeholders = ','.join('?' for _ in active_symbols)
