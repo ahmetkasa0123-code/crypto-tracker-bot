@@ -8,7 +8,11 @@ from telegram_bot import TelegramNotifier
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.FileHandler("app.log", mode='w'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger("main")
 
@@ -18,11 +22,19 @@ from aiohttp import web
 global_tracker = None
 
 async def health_check(request):
+    log_content = ""
+    try:
+        with open("app.log", "r") as f:
+            lines = f.readlines()
+            log_content = "".join(lines[-20:])
+    except Exception as e:
+        log_content = str(e)
+
     if global_tracker:
         symbols_count = len(getattr(global_tracker, 'symbols', []))
         is_running = getattr(global_tracker, 'is_running', False)
-        return web.Response(text=f"Bot is running! Tracker: {is_running}, Symbols: {symbols_count}")
-    return web.Response(text="Bot is running! Tracker not started yet.")
+        return web.Response(text=f"Bot is running! Tracker: {is_running}, Symbols: {symbols_count}\n\nLogs:\n{log_content}")
+    return web.Response(text=f"Bot is running! Tracker not started yet.\n\nLogs:\n{log_content}")
 
 async def start_web_server():
     app = web.Application()
