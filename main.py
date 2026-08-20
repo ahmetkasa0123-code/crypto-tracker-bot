@@ -77,11 +77,21 @@ async def main():
         
         tracker = BinanceTracker(config, tg_bot)
         tracker_task = asyncio.create_task(tracker.run())
+        restart_task = asyncio.create_task(restart_event.wait())
         
-        # Yeniden başlatma sinyali (restart_event) gelene kadar bekle
-        await restart_event.wait()
+        # Yeniden başlatma sinyali VEYA tracker'ın çökmesini bekle
+        done, pending = await asyncio.wait(
+            [restart_task, tracker_task],
+            return_when=asyncio.FIRST_COMPLETED
+        )
         
-        logger.info("Ayar değişikliği algılandı. Tracker yeniden başlatılıyor...")
+        if tracker_task in done:
+            logger.error("Tracker beklenmedik şekilde durdu! 10 saniye sonra yeniden başlatılacak...")
+            await asyncio.sleep(10)
+        else:
+            logger.info("Ayar değişikliği algılandı. Tracker yeniden başlatılıyor...")
+            
+        restart_event.clear()
         
         # Eski tracker'ı durdur
         tracker.stop()
@@ -91,9 +101,6 @@ async def main():
             await asyncio.wait_for(tracker_task, timeout=5.0)
         except asyncio.TimeoutError:
             tracker_task.cancel()
-            
-        # Event'i temizle ve döngüyü baştan başlat
-        restart_event.clear()
 
 if __name__ == "__main__":
     try:
